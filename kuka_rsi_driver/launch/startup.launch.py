@@ -134,6 +134,7 @@ def launch_setup(context, *args, **kwargs):
         namespace=ns,
         package="kuka_drivers_core",
         executable="control_node",
+        output="both",
         parameters=[
             robot_description,
             controller_config,
@@ -153,6 +154,7 @@ def launch_setup(context, *args, **kwargs):
             if driver_version.perform(context) == "rsi_only"
             else "robot_manager_node_eki_rsi"
         ),
+        output="both",
         parameters=[driver_config, {"robot_model": robot_model, "use_gpio": use_gpio}],
     )
     robot_state_publisher = Node(
@@ -180,7 +182,7 @@ def launch_setup(context, *args, **kwargs):
         if not activate:
             arg_list.append("--inactive")
 
-        return Node(package="controller_manager", executable="spawner", arguments=arg_list)
+        return Node(package="controller_manager", executable="spawner", arguments=arg_list, output="both")
 
     controllers = {"joint_state_broadcaster": None, "joint_trajectory_controller": jtc_config}
 
