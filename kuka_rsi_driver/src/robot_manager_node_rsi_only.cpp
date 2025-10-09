@@ -107,7 +107,7 @@ RobotManagerNodeRsi::on_activate(const rclcpp_lifecycle::State &)
 {
   // Activate hardware interface
   if (!kuka_drivers_core::changeHardwareState(
-        change_hardware_state_client_, robot_model_, State::PRIMARY_STATE_ACTIVE, 10000))
+        change_hardware_state_client_, robot_model_, State::PRIMARY_STATE_ACTIVE, 100000))
   {
     RCLCPP_ERROR(get_logger(), "Could not activate hardware interface");
     return FAILURE;
