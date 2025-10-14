@@ -17,6 +17,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, EmitEvent, LogInfo,
                             OpaqueFunction, RegisterEventHandler, TimerAction)
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessStart
 from launch.events import matches_action
 from launch.substitutions import (Command, FindExecutable, LaunchConfiguration,
@@ -49,6 +50,7 @@ def launch_setup(context, *args, **kwargs):
     controller_config = LaunchConfiguration("controller_config")
     jtc_config = LaunchConfiguration("jtc_config")
     gpio_config = LaunchConfiguration("gpio_config")
+    use_sim = LaunchConfiguration("use_sim")
     if ns.perform(context) == "":
         tf_prefix = ""
     else:
@@ -160,6 +162,13 @@ def launch_setup(context, *args, **kwargs):
         parameters=[driver_config, {"robot_model": robot_model, "use_gpio": use_gpio}],
     )
 
+    simulator_node = Node(
+        name="kuka_rsi_simulator",
+        package="kuka_rsi_simulator",
+        executable="rsi_simulator",
+        output="screen",
+    )
+
     configure_event = EmitEvent(
         event=ChangeState(
             lifecycle_node_matcher=matches_action(robot_manager_node),
@@ -177,7 +186,7 @@ def launch_setup(context, *args, **kwargs):
     on_driver_start = RegisterEventHandler(
         OnProcessStart(
             target_action=control_node,
-            on_start=[TimerAction(period=1.0, actions=[
+            on_start=[TimerAction(period=3.0, actions=[
                 LogInfo(msg="Control node started, now configuring robot manager..."),
                 configure_event]),
             ],
@@ -188,9 +197,13 @@ def launch_setup(context, *args, **kwargs):
         OnStateTransition(
             target_lifecycle_node=robot_manager_node,
             goal_state="inactive",
-            entities=[TimerAction(period=3.0, actions=[
+            entities=[TimerAction(period=5.0, actions=[
                 LogInfo(msg="Robot manager configured, now activating..."),
-                activate_event
+                activate_event] +
+                [TimerAction(period=1.0, actions=[
+                    LogInfo(msg="Robot manager activated, starting simulator (if used)..."),
+                    simulator_node
+                ] if use_sim.perform(context) == "true" else [])
             ]),
             ]
         )
@@ -278,6 +291,11 @@ def generate_launch_description():
     launch_arguments.append(
         DeclareLaunchArgument(
             "verify_robot_model", default_value="true", choices=["true", "false"]
+        )
+    )
+    launch_arguments.append(
+        DeclareLaunchArgument(
+            "use_sim", default_value="false", choices=["true", "false"]
         )
     )
     launch_arguments.append(DeclareLaunchArgument("controller_config", default_value=""))

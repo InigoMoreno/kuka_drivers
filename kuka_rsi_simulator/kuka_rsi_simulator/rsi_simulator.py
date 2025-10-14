@@ -105,7 +105,7 @@ class RSISimulator(Node):
             self.socket_.sendto(msg, (self.rsi_ip_address_, self.rsi_port_address_))
             recv_msg, _ = self.socket_.recvfrom(1024)
             self.rsi_cmd_pub_.publish(recv_msg)
-            self.get_logger().warn(f"msg: {recv_msg}")
+            # self.get_logger().warn(f"msg: {recv_msg}")
             des_joint_correction_absolute, ipoc_recv, stop_flag = parse_rsi_xml_sen(recv_msg)
             if ipoc_recv == self.ipoc:
                 self.act_joint_pos = self.initial_joint_pos + des_joint_correction_absolute
