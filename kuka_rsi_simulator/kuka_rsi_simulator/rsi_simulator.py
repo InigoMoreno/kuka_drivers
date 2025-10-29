@@ -58,7 +58,7 @@ def parse_rsi_xml_sen(data):
 
 
 class RSISimulator(Node):
-    cycle_time = 0.04
+    cycle_time = 0.003
     act_joint_pos = np.array([0, -90, 90, 0, 90, 0]).astype(np.float64)
     initial_joint_pos = act_joint_pos.copy()
     des_joint_correction_absolute = np.zeros(6)
@@ -107,15 +107,15 @@ class RSISimulator(Node):
             self.rsi_cmd_pub_.publish(recv_msg)
             # self.get_logger().warn(f"msg: {recv_msg}")
             des_joint_correction_absolute, ipoc_recv, stop_flag = parse_rsi_xml_sen(recv_msg)
-            if ipoc_recv == self.ipoc:
-                self.act_joint_pos = self.initial_joint_pos + des_joint_correction_absolute
-            else:
-                self.get_logger().warn(f"{self.node_name_}: Packet is late")
-                self.get_logger().warn(
-                    f"{self.node_name_}: sent ipoc: {self.ipoc}, received: {ipoc_recv}"
-                )
-                if self.ipoc != 0:
-                    self.timeout_count += 1
+            # if ipoc_recv == self.ipoc:
+            self.act_joint_pos = self.initial_joint_pos + des_joint_correction_absolute
+            # else:
+            #     self.get_logger().warn(f"{self.node_name_}: Packet is late")
+            #     self.get_logger().warn(
+            #         f"{self.node_name_}: sent ipoc: {self.ipoc}, received: {ipoc_recv}"
+            #     )
+            #     if self.ipoc != 0:
+            #         self.timeout_count += 1
             self.ipoc += 1
             if stop_flag:
                 self.on_shutdown()
