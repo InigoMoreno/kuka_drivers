@@ -1,4 +1,4 @@
-# Copyright 2024 Aron Svastits
+# Copyright 2024 KUKA Hungaria Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ def generate_test_description():
                     "namespace": "test1",
                     "controller_config": f"{test_config_dir + 'test1_ros2_controller_config.yaml'}",  # noqa: E501
                     "jtc_config": f"{test_config_dir + 'test1_joint_trajectory_controller_config.yaml'}",  # noqa: E501
+                    "cm_log_level": "INFO",
                 }.items(),
             ),
             IncludeLaunchDescription(
@@ -61,6 +62,7 @@ def generate_test_description():
                     "controller_config": f"{test_config_dir + 'test2_ros2_controller_config.yaml'}",  # noqa: E501
                     "jtc_config": f"{test_config_dir + 'test2_joint_trajectory_controller_config.yaml'}",  # noqa: E501
                     "x": "2",
+                    "cm_log_level": "INFO",
                 }.items(),
             ),
             launch_testing.actions.ReadyToTest(),

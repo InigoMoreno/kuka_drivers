@@ -1,4 +1,4 @@
-# Copyright 2024 Aron Svastits
+# Copyright 2024 KUKA Hungaria Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ def generate_test_description():
                     "jtc_config": f"{test_config_dir + 'test1_joint_trajectory_controller_config.yaml'}",  # noqa: E501
                     "jic_config": f"{test_config_dir + 'test1_joint_impedance_controller_config.yaml'}",  # noqa: E501
                     "ec_config": f"{test_config_dir + 'test1_effort_controller_config.yaml'}",
+                    "cm_log_level": "INFO",
                 }.items(),
             ),
             IncludeLaunchDescription(
@@ -65,6 +66,7 @@ def generate_test_description():
                     "jic_config": f"{test_config_dir + 'test2_joint_impedance_controller_config.yaml'}",  # noqa: E501
                     "ec_config": f"{test_config_dir + 'test2_effort_controller_config.yaml'}",
                     "x": "2",
+                    "cm_log_level": "INFO",
                 }.items(),
             ),
             launch_testing.actions.ReadyToTest(),

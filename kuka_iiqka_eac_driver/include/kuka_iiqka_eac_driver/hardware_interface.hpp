@@ -1,4 +1,4 @@
-// Copyright 2022 Aron Svastits
+// Copyright 2022 KUKA Hungaria Kft.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -71,8 +71,6 @@ public:
 
   KUKA_IIQKA_EAC_DRIVER_PUBLIC void set_server_event(kuka_drivers_core::HardwareEvent event);
 
-  KUKA_IIQKA_EAC_DRIVER_PUBLIC void set_stop_flag() { stop_requested_ = true; }
-
   KUKA_IIQKA_EAC_DRIVER_PUBLIC void reset_cycle_count() { cycle_count_ = 0; }
 
 private:
@@ -100,7 +98,6 @@ private:
     kuka_drivers_core::HardwareEvent::HARDWARE_EVENT_UNSPECIFIED;
 
   bool msg_received_;
-  std::atomic<bool> stop_requested_{false};
 };
 }  // namespace kuka_eac
 

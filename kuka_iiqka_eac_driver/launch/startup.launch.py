@@ -39,6 +39,9 @@ def launch_setup(context, *args, **kwargs):
     jtc_config = LaunchConfiguration("jtc_config")
     jic_config = LaunchConfiguration("jic_config")
     ec_config = LaunchConfiguration("ec_config")
+    # Controller manager prints a lot of warnings if cycle time is exceeded,
+    #  which can be suppressed by this argument
+    cm_log_level = LaunchConfiguration("cm_log_level")
     if ns.perform(context) == "":
         tf_prefix = ""
     else:
@@ -59,6 +62,9 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "mode:=",
             mode,
+            " ",
+            "driver_version:=",
+            "eac",
             " ",
             "controller_ip:=",
             controller_ip,
@@ -118,6 +124,12 @@ def launch_setup(context, *args, **kwargs):
                     "unconfigured": [tf_prefix + robot_model.perform(context)]
                 },
             },
+        ],
+        # Disable controller manager warnings about roundtrip time violations
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            f"controller_manager:={cm_log_level.perform(context)}",
         ],
     )
     robot_manager_node = LifecycleNode(
@@ -196,6 +208,13 @@ def generate_launch_description():
     launch_arguments.append(DeclareLaunchArgument("pitch", default_value="0"))
     launch_arguments.append(DeclareLaunchArgument("yaw", default_value="0"))
     launch_arguments.append(DeclareLaunchArgument("roundtrip_time", default_value="2500"))
+    launch_arguments.append(
+        DeclareLaunchArgument(
+            "cm_log_level",
+            default_value="ERROR",
+            choices=["DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+        )
+    )
     launch_arguments.append(
         DeclareLaunchArgument(
             "qos_config",

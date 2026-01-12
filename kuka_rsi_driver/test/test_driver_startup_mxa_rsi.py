@@ -40,7 +40,7 @@ def generate_test_description():
                     ]
                 ),
                 launch_arguments={
-                    "driver_version": "eki_rsi",
+                    "driver_version": "mxa_rsi",
                     "cm_log_level": "INFO",
                 }.items(),
             ),
