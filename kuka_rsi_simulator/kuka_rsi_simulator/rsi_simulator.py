@@ -120,10 +120,12 @@ class RSISimulator(Node):
             if stop_flag:
                 self.on_shutdown()
                 sys.exit()
-        except OSError:
-            if self.ipoc != 0:
-                self.timeout_count += 1
-                self.get_logger().warn(f"{self.node_name_}: Socket timed out")
+        except OSError as e:
+            pass
+            # if self.ipoc != 0:
+                # self.timeout_count += 1
+                # self.get_logger().warn(f"{self.node_name_}: Socket timed out: {e}")
+
 
     def on_shutdown(self):
         self.socket_.close()
