@@ -212,13 +212,14 @@ To configure the client side, two configuration files need to be completed:
 3. Start the `KRC:\R1\Program\rsi_joint_pos_4ms.src`/`KRC:\R1\Program\rsi_joint_pos_12ms.src` program on the controller and execute the line of `RSI_MOVECORR()`
     - in T1, a warning (*!!! Attention - Sensor correction goes active !!!*) should be visible after reaching `RSI_MOVECORR()`, which should be confirmed to start this step
 
-On successful activation the brakes of the robot will be released and external control is started. To test moving the robot, the `rqt_joint_trajectory_controller` is not recommended, use the launch file in the `iiqka_moveit_example` package instead (usage is described in the [Additional packages](https://github.com/kroshu/kuka_drivers/wiki#additional-packages) section of the project overview).
+On successful activation the brakes of the robot will be released and external control is started. To test moving the robot, the `rqt_joint_trajectory_controller` is not recommended, use the launch file in the `iiqka_moveit_example` package instead (usage is described in the [Additional packages](https://github.com/kroshu/kuka_drivers/wiki#moveit-integration) section of the project overview).
 
 ##### Launch arguments
 
 Both launch files support the following arguments:
 
 - `client_port`: port of the client machine (default: 59152)
+- `mxa_client_port`: port of the client machine where mxAutomation packets are received (default: 1337)
 - `robot_model` and `robot_family`: defines which robot to use. The available options for the valid model and family combinations can be found in the [readme](https://github.com/kroshu/kuka_robot_descriptions?tab=readme-ov-file#what-data-is-verified) of the `kuka_robot_descriptions` repository.
 - `mode`: if set to 'mock', the `KukaMockHardwareInterface` will be used instead of the `KukaRSIHardwareInterface`. This enables trying out the driver without actual hardware.
 - `use_gpio`: if set to `false` the usage of I/Os are disabled (defaults to `true`).
@@ -231,6 +232,10 @@ Both launch files support the following arguments:
 - `driver_version`: configures which driver to use. Possible values are `rsi_only` and `eki_rsi` (defaults to `rsi_only`)
 - `verify_robot_model`: If set to `true` and `driver_version` is set to `eki_rsi`, the driver will verify that the robot model specified in the launch arguments matches the configuration reported by the controller. If set to `false`, the reported configuration won't be checked (defaults to `true`).
 - `cm_log_level` (only jazzy): It is possible to set the `controller_manager`'s log level with this argument, to avoid flooding the log output by warnings about cycle time violations
+- `rt_core`: CPU core index for taskset pinning of the realtime control thread. (default: -1 = do not pin)
+- `rt_prio`: The realtime priority of the thread that runs the control loop [0-99] (default: 70)
+- `non_rt_cores`: Comma-separated CPU core indices for taskset pinning of non-RT threads (e.g. '2,3,4'). Leave empty to disable pinning. (defaults to empty string)
+
 
 The `startup_with_rviz.launch.py` additionally contains one argument:
 
@@ -317,3 +322,57 @@ Once the driver is launched, one can use the standard ROS 2 lifecycle transition
 - `ros2 lifecycle set /robot_manager cleanup`: Terminates the connection to the robot controller
 
 The integration of EKI not only helps the initiation of external control but also unlocks additional capabilities via ROS 2 controllers. For more details, refer to the [Controllers](https://github.com/kroshu/kuka_drivers/wiki/5_Controllers) wiki page.
+
+
+## External axes configuration
+
+Both KSS and the RSI option package support adding external axes to the robot. We provide an [example](https://github.com/kroshu/examples/blob/master/kuka_external_axis_examples) that integrates a single linear axis. This example, together with the structure and documentation, should help users implement their own external‑axis configurations.
+
+### Controller-side configuration
+
+Use the files in [`kuka_external_control_sdk/krc_setup/kss`](https://github.com/kroshu/kuka-external-control-sdk/tree/master/kuka_external_control_sdk/krc_setup/kss) when configuring the controller side.
+
+#### Context
+
+The `Config/User/Common/SensorInterface/rsi_ext_axis_example.rsix` contains an example setup with one linear external axis.
+
+Compared to the original context the following changes were required:
+
+- Add the `AxisCorrExt` object.
+- Connect `Ethernet` object's `Out8` output to the first input of `AxisCorrExt`.
+- Update the `LowerLimE1` and `UpperLimE1` parameters of `AxisCorrExt`.
+- Update the `MaxE1` parameter of the `AxisCorrMon` object.
+
+To create a new custom context:
+
+- Connect the next `OutX` output of the `Ethernet` object to the corresponding `CorrEX` input of `AxisCorrExt` for each external axis.
+- Adjust limits (`MaxEX`, `LowerLimX`, `UpperLimX`) accordingly.
+
+#### Ethernet configuration
+
+The configuration file referenced by the Ethernet object must also be updated. See the example in: `Config/User/Common/SensorInterface/rsi_ext_axis_ethernet.xml`.
+
+The only difference from the original configuration is an additional line in the `RECEIVE` block:
+
+```xml
+<ELEMENT TAG="EK.E1" TYPE="DOUBLE" INDX="8" HOLDON="1" />
+```
+
+This allows RSI to parse data from the driver.
+
+> [!IMPORTANT]
+> Use a consistent naming convention for external-axis values (`TAG="EK.EX"`), incrementing `X` for each axis. Ensure `INDX` values also increase sequentially.
+
+> [!IMPORTANT]
+> When using GPIOs, list external axes before adding GPIO message configuration. The correct order is: internal axes &rarr; external axes &rarr; GPIOs.
+
+#### Program
+
+To adapt the KRL program for the external-axis example, update the RSI context name in either `KRC/R1/Program/RSI/rsi_joint_pos_4ms.src` or `KRC/R1/Program/RSI/rsi_joint_pos_12ms.src`, depending on your use case, to `rsi_ext_axis_example`. For custom setups, use the name of the corresponding context file.
+
+### Client-side configuration
+
+See the [kuka_robot_descriptions README](https://github.com/kroshu/kuka_robot_descriptions/blob/master/README.md#external-axes-configuration) for all client-side configuration steps.
+
+> [!NOTE]
+> The driver supports only __revolute__ and __prismatic__ external joints.

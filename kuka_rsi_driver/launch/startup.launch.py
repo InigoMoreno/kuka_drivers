@@ -37,6 +37,7 @@ def launch_setup(context, *args, **kwargs):
     driver_version = LaunchConfiguration("driver_version")
     client_ip = LaunchConfiguration("client_ip")
     client_port = LaunchConfiguration("client_port")
+    mxa_client_port = LaunchConfiguration("mxa_client_port")
     controller_ip = LaunchConfiguration("controller_ip")
     x = LaunchConfiguration("x")
     y = LaunchConfiguration("y")
@@ -54,10 +55,34 @@ def launch_setup(context, *args, **kwargs):
     #  which can be suppressed by this argument
     cm_log_level = LaunchConfiguration("cm_log_level")
     use_sim = LaunchConfiguration("use_sim")
+    non_rt_cores = LaunchConfiguration("non_rt_cores")
+    rt_core = LaunchConfiguration("rt_core")
+    rt_prio = LaunchConfiguration("rt_prio")
     if ns.perform(context) == "":
         tf_prefix = ""
     else:
         tf_prefix = ns.perform(context) + "_"
+
+    # Parse allowed cores into a list of integers; allow formats like "2,3, 4" or "  "
+    cores = []
+    for part in non_rt_cores.perform(context).split(","):
+        part = part.strip()
+        if part == "":
+            continue
+        try:
+            cores.append(int(part))
+        except ValueError:
+            raise RuntimeError(
+                f"Invalid allowed_cores entry: '{part}'. "
+                "Provide a comma-separated list of integers, e.g. '2,3,4'."
+            )
+
+    # Compute the prefix: None if no cores; otherwise build 'taskset -c <list>'
+    prefix_cmd = None
+    if cores:
+        # Build the string "2,3,4" for taskset
+        core_list_str = ",".join(str(c) for c in cores)
+        prefix_cmd = f"taskset -c {core_list_str}"
 
     if not controller_config.perform(context):
         rel_path_to_config_file = (
@@ -93,6 +118,9 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "client_port:=",
             client_port,
+            " ",
+            "mxa_client_port:=",
+            mxa_client_port,
             " ",
             "client_ip:=",
             client_ip,
@@ -146,6 +174,8 @@ def launch_setup(context, *args, **kwargs):
             robot_description,
             controller_config,
             {
+                "cpu_affinity": int(rt_core.perform(context)),
+                "thread_priority": int(rt_prio.perform(context)),
                 "hardware_components_initial_state": {
                     "unconfigured": [tf_prefix + robot_model.perform(context)]
                 },
@@ -157,6 +187,7 @@ def launch_setup(context, *args, **kwargs):
             "--log-level",
             f"controller_manager:={cm_log_level.perform(context)}",
         ],
+        prefix=prefix_cmd,
     )
     robot_manager_node = LifecycleNode(
         name=["robot_manager"],
@@ -169,6 +200,7 @@ def launch_setup(context, *args, **kwargs):
         ),
         output="both",
         parameters=[driver_config, {"robot_model": robot_model, "use_gpio": use_gpio}],
+        prefix=prefix_cmd,
     )
 
     simulator_node = Node(
@@ -224,10 +256,11 @@ def launch_setup(context, *args, **kwargs):
         executable="robot_state_publisher",
         output="both",
         parameters=[robot_description],
+        prefix=prefix_cmd,
     )
 
     # Spawn controllers
-    def controller_spawner(controller_name, param_file=None, activate=False):
+    def controller_spawner(controller_name, prefix_cmd, param_file=None, activate=False):
         arg_list = [
             controller_name,
             "-c",
@@ -243,7 +276,13 @@ def launch_setup(context, *args, **kwargs):
         if not activate:
             arg_list.append("--inactive")
 
-        return Node(package="controller_manager", executable="spawner", arguments=arg_list, output="both")
+        return Node(
+            package="controller_manager",
+            executable="spawner",
+            prefix=prefix_cmd,
+            arguments=arg_list,
+            output="both",
+        )
 
     controllers = {
         "joint_state_broadcaster": None,
@@ -259,7 +298,8 @@ def launch_setup(context, *args, **kwargs):
         controllers["kss_message_handler"] = None
 
     controller_spawners = [
-        controller_spawner(name, param_file) for name, param_file in controllers.items()
+        controller_spawner(name, prefix_cmd, param_file)
+        for name, param_file in controllers.items()
     ]
 
     nodes_to_start = [
@@ -292,6 +332,7 @@ def generate_launch_description():
     launch_arguments.append(DeclareLaunchArgument("namespace", default_value=""))
     launch_arguments.append(DeclareLaunchArgument("client_ip", default_value="0.0.0.0"))
     launch_arguments.append(DeclareLaunchArgument("client_port", default_value="59152"))
+    launch_arguments.append(DeclareLaunchArgument("mxa_client_port", default_value="1337"))
     launch_arguments.append(DeclareLaunchArgument("controller_ip", default_value="0.0.0.0"))
     launch_arguments.append(DeclareLaunchArgument("x", default_value="0"))
     launch_arguments.append(DeclareLaunchArgument("y", default_value="0"))
@@ -330,6 +371,30 @@ def generate_launch_description():
             "gpio_config",
             default_value=get_package_share_directory("kuka_rsi_driver")
             + "/config/gpio_controller_config.yaml",
+        )
+    )
+    launch_arguments.append(
+        DeclareLaunchArgument(
+            "rt_core",
+            default_value="-1",  # -1 means do not pin to core
+            description=("CPU core index for taskset pinning of the RT thread"),
+        )
+    )
+    launch_arguments.append(
+        DeclareLaunchArgument(
+            "rt_prio",
+            default_value="70",
+            description=("The priority of the thread that runs the control loop"),
+        )
+    )
+    launch_arguments.append(
+        DeclareLaunchArgument(
+            "non_rt_cores",
+            default_value="",
+            description=(
+                "Comma-separated CPU core indices for taskset pinning of non-RT threads "
+                "(e.g. '2,3,4'). Leave empty to disable pinning."
+            ),
         )
     )
 
