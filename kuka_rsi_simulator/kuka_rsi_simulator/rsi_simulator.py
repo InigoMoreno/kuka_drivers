@@ -17,12 +17,13 @@ import sys
 import xml.etree.ElementTree as ET
 
 import numpy as np
+import yaml
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
 
-def create_rsi_xml_rob(act_joint_pos, timeout_count, ipoc):
+def create_rsi_xml_rob(act_joint_pos, timeout_count, ipoc, gpios=None):
     q = act_joint_pos
     root = ET.Element("Rob", {"TYPE": "KUKA"})
     ET.SubElement(
@@ -31,6 +32,8 @@ def create_rsi_xml_rob(act_joint_pos, timeout_count, ipoc):
     ET.SubElement(root, "AIPos", {f"A{i+1}": str(q[i]) for i in range(6)})
     ET.SubElement(root, "EIPos", {f"E{i+1}": str(q[i + 6]) for i in range(6)})
     ET.SubElement(root, "Delay", {"D": str(timeout_count)})
+    if gpios is not None:
+        ET.SubElement(root, "GPIO", {gpio: "0.0" for gpio in gpios})
     ET.SubElement(root, "IPOC").text = str(ipoc)
     return ET.tostring(root, encoding="utf-8", method="xml").replace(b" />", b"/>")
 
@@ -58,7 +61,7 @@ def parse_rsi_xml_sen(data):
 
 
 class RSISimulator(Node):
-    cycle_time = 0.003
+    cycle_time = 12/1000
     act_joint_pos = np.array([0, -90, 90, 0, 90, 0] + [0] * 6).astype(np.float64)
     initial_joint_pos = act_joint_pos.copy()
     des_joint_correction_absolute = np.zeros(12)
@@ -73,6 +76,16 @@ class RSISimulator(Node):
 
     def __init__(self, node_name):
         super().__init__(node_name)
+        self.declare_parameter("gpio_config","")
+        print(self.get_parameter("gpio_config").get_parameter_value().string_value)
+        self.gpios = None
+        gpio_config_file = self.get_parameter("gpio_config").get_parameter_value().string_value
+        if gpio_config_file != "":
+            with open(gpio_config_file, "r") as f:
+                gpio_config_dict = yaml.safe_load(f)
+            gpios = gpio_config_dict.get("gpio_controller", {}).get("ros__parameters", {}).get("state_interfaces", {}).get("gpio", [])
+            if len(gpios) > 0:
+                self.gpios = gpios[0].get("interfaces", [])
         self.node_name_ = node_name
         self.timer = self.create_timer(self.cycle_time, self.timer_callback)
         self.declare_parameter("rsi_ip_address", "127.0.0.1")
@@ -95,7 +108,7 @@ class RSISimulator(Node):
             self.get_logger().fatal("Timeout count of 100 exceeded")
             sys.exit()
         try:
-            msg = create_rsi_xml_rob(self.act_joint_pos, self.timeout_count, self.ipoc)
+            msg = create_rsi_xml_rob(self.act_joint_pos, self.timeout_count, self.ipoc, self.gpios)
             self.rsi_act_pub_.publish(msg)
             self.socket_.sendto(msg, (self.rsi_ip_address_, self.rsi_port_address_))
             recv_msg, _ = self.socket_.recvfrom(1024)
@@ -104,6 +117,7 @@ class RSISimulator(Node):
             des_joint_correction_absolute, ipoc_recv, stop_flag = parse_rsi_xml_sen(recv_msg)
             if ipoc_recv == self.ipoc:
                 self.act_joint_pos = self.initial_joint_pos + des_joint_correction_absolute
+                self.ipoc += 1
             else:
                 self.get_logger().warn(f"{self.node_name_}: Packet is late")
                 self.get_logger().warn(
@@ -111,7 +125,6 @@ class RSISimulator(Node):
                 )
                 if self.ipoc != 0:
                     self.timeout_count += 1
-            self.ipoc += 1
             if stop_flag:
                 self.on_shutdown()
                 sys.exit()

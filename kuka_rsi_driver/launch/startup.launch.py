@@ -208,6 +208,9 @@ def launch_setup(context, *args, **kwargs):
         package="kuka_rsi_simulator",
         executable="rsi_simulator",
         output="screen",
+        parameters=[{
+            "gpio_config": LaunchConfiguration("gpio_config"),
+        }]
     )
 
     configure_event = EmitEvent(
