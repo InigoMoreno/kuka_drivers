@@ -94,6 +94,7 @@ RobotManagerBase::RobotManagerBase() : kuka_drivers_core::ROS2BaseLCNode("robot_
       // Set default cycle time (from parameter)
       return ValidateCycleTime(static_cast<CycleTime>(cycle_time));  // 1 => 4ms, 2 => 12ms
     });
+  ValidateCycleTime(static_cast<CycleTime>(this->get_parameter("cycle_time").as_int()));
 }
 
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
@@ -121,6 +122,11 @@ RobotManagerBase::configure_driver(const std::vector<std::string> & controllers_
   is_configured_msg_.data = true;
   is_configured_pub_->publish(is_configured_msg_);
 
+  // kss_message_handler is now active; (re)publish so it picks up the value.
+  if (cycle_time_ == CycleTime::UNDEFINED)
+  {
+    ValidateCycleTime(static_cast<CycleTime>(this->get_parameter("cycle_time").as_int()));
+  }
   std_msgs::msg::UInt8 msg;
   msg.data = static_cast<uint8_t>(cycle_time_);
   cycle_time_pub_->publish(msg);
